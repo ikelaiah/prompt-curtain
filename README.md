@@ -2,7 +2,9 @@
 
 **Keep the useful context in your AI prompts. Hide the personal details.**
 
-PromptCurtain is a small, free tool that protects personal information before you share a prompt with an AI. It runs in your browser, works offline, and keeps your text on your device.
+PromptCurtain is a portable, offline tool for reviewing, protecting and restoring everyday AI prompts—with Markdown support and no installation.
+
+Open a single HTML file in your browser, review the sensitive details, and copy the protected prompt into your AI tool. Paste the AI's reply back to restore matching values. Your text stays on your device, with no accounts, model downloads, telemetry or browser storage.
 
 ## 🚀 Get started
 
