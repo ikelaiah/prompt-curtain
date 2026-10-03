@@ -12,6 +12,8 @@ Text is processed locally and kept in page memory. No external scripts, fonts, a
 4. Copy the protected text into your AI tool. This also saves the original-value mapping in this page’s memory.
 5. Paste the AI response into **AI reply**. Review and copy the **Restored reply**, with original details reinserted locally.
 
+Select a missed value in **Original text** and choose **Protect selection** to mask just that span; edits to the source clear manual spans so stale offsets are not reused. Credentials detected in private key blocks, `Bearer` authorization values, or explicit password/token/API-key fields are always fully masked in both modes and never restored. Review the matching reason before copying; detection covers common patterns, not every credential format.
+
 Panels **01 Original text** and **03 AI reply** accept Markdown in **Edit** and render it in **Preview**. Panels **02 Protected text** and **04 Restored reply** render Markdown automatically, including headings, bold/italic text, lists, tables, blockquotes, and code blocks. Both copy buttons copy the underlying Markdown source, preserving its syntax while applying protection or restoration. If clipboard access fails, a read-only field selects that Markdown source for manual copying.
 
 HTML is displayed literally. Markdown links and images show their labels and destinations as text; previews do not navigate or load images. The MIT-licensed Marked 18.0.14 parser and its license are embedded in `index.html` to keep the page self-contained and offline. Protected values remain literal and highlighted in the rendered preview.
@@ -29,6 +31,10 @@ Use the header’s theme button to switch between light and dark. The initial th
 **Network & drive paths** covers Windows UNC shares (`\\server\share\file.txt`), SMB URLs (`smb://server/share/file.txt`), and Windows drive paths (`P:\Payroll\staff.csv`). Both mapped and local drive paths are protected because text alone cannot tell which a drive letter represents. Paths use consistent `[PATH_1]` placeholders in Mask mode. Redact partially hides each path segment while retaining separators and drive/scheme prefixes. Put paths containing spaces in quotes so the full path is captured, for example `"\\school-server\Student Records\Jamie Smith.docx"`. Unquoted paths end at whitespace or punctuation; review any remaining details.
 
 Detection uses patterns, not a language model. It covers emails, common phone formats, English street addresses, Luhn-valid card numbers, US SSNs, IPv4 addresses, network/drive paths, and names following cues such as `Name:`, `Student:`, `Employee:`, or `My name is`. It can miss personal details and identify false positives. Use custom phrases for school names, device names, student/employee IDs, bank accounts, tax identifiers outside the US, and other work-specific details. Review all output before sharing.
+
+## Synthetic detection baseline
+
+Run `node scripts/evaluate.js` to report exact-span precision and recall by category on the fictional cases in `fixtures/detection.json`. This small hand-labelled corpus is a regression aid, not an estimate of real-world accuracy. GitHub Actions runs it alongside the unit tests.
 
 ## Verification
 

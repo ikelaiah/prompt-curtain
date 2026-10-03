@@ -1,0 +1,15 @@
+[
+  {"name":"email and repeated identity","text":"Contact alex@example.test or alex@example.test.","expected":[{"type":"EMAIL","value":"alex@example.test","occurrence":0},{"type":"EMAIL","value":"alex@example.test","occurrence":1}]},
+  {"name":"international phones and US identifier","text":"Call +61 412 345 678 or (415) 555-0132. Reference 123-45-6789.","expected":[{"type":"PHONE","value":"+61 412 345 678"},{"type":"PHONE","value":"(415) 555-0132"},{"type":"ID","value":"123-45-6789"}]},
+  {"name":"contextual name and street address","text":"Student: Jamie Smith lives at 42 Maple Street, Sydney.","expected":[{"type":"NAME","value":"Jamie Smith"},{"type":"ADDRESS","value":"42 Maple Street"}]},
+  {"name":"valid card and IP address","text":"Card 4111 1111 1111 1111 from 192.168.1.12.","expected":[{"type":"CARD","value":"4111 1111 1111 1111"},{"type":"IP","value":"192.168.1.12"}]},
+  {"name":"quoted drive path and network share","text":"Open \"P:\\Payroll Reports\\October.xlsx\" and \\\\server\\share\\report.csv.","expected":[{"type":"PATH","value":"P:\\Payroll Reports\\October.xlsx"},{"type":"PATH","value":"\\\\server\\share\\report.csv"}]},
+  {"name":"custom internal identifier","text":"Device WS-019 needs a restart.","custom":["WS-019"],"expected":[{"type":"CUSTOM","value":"WS-019"}]},
+  {"name":"Markdown email field","text":"**Email:** alex@example.test","expected":[{"type":"EMAIL","value":"alex@example.test"}]},
+  {"name":"password assignment","text":"password = Example-Password-937","expected":[{"type":"SECRET","value":"Example-Password-937"}]},
+  {"name":"bearer authorization","text":"Authorization: Bearer eyJhbGciOi.test.signature","expected":[{"type":"SECRET","value":"eyJhbGciOi.test.signature"}]},
+  {"name":"private key block","text":"-----BEGIN PRIVATE KEY-----\nFAKE-KEY-CONTENT-DO-NOT-USE\n-----END PRIVATE KEY-----","expected":[{"type":"SECRET","value":"-----BEGIN PRIVATE KEY-----\nFAKE-KEY-CONTENT-DO-NOT-USE\n-----END PRIVATE KEY-----"}]},
+  {"name":"ordinary numeric reference","text":"Ticket 12345 is in queue 200; version 1.2.3."},
+  {"name":"invalid card and invalid IP","text":"4111 1111 1111 1112 at 999.999.999.999."},
+  {"name":"ordinary token words without credentials","text":"The token count is 12 and the password policy is documented."}
+]

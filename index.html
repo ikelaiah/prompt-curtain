@@ -115,8 +115,9 @@ dialog::backdrop{background:#0b1e3273}
 <div class="controls"><div class="controls-label"><span>WHAT SHOULD WE PROTECT?</span><span>Choose the details to look for</span></div><div class="chips" id="categories">
 <label class="chip"><input type="checkbox" value="NAME" checked>Names <span title="Names detected after cues such as ‘Name:’ and ‘My name is’">ⓘ</span></label><label class="chip"><input type="checkbox" value="EMAIL" checked>Email addresses</label><label class="chip"><input type="checkbox" value="PHONE" checked>Phone numbers</label><label class="chip"><input type="checkbox" value="ADDRESS" checked>Street addresses</label><label class="chip"><input type="checkbox" value="CARD" checked>Credit cards</label><label class="chip"><input type="checkbox" value="ID" checked>US SSNs</label><label class="chip"><input type="checkbox" value="IP" checked>IP addresses</label>
 <label class="chip"><input id="path-category" type="checkbox" value="PATH" checked>Network &amp; drive paths <span title="UNC shares, smb:// URLs, and Windows drive paths. Use quotes around paths containing spaces.">ⓘ</span></label>
+<label class="chip"><input type="checkbox" checked disabled>Credentials (always masked)</label>
 </div><p class="path-help">Paths with spaces? Wrap them in quotes: <code>"\\server\Shared Files\report.xlsx"</code>. Add custom phrases for student IDs, employee IDs, or other internal details.</p><div class="custom-wrap"><input id="custom" aria-label="Custom name or phrase to protect" placeholder="Add a name or phrase to protect…" maxlength="200"><button id="add-custom">+ Add custom</button></div><div id="custom-tags" class="custom-tags"></div></div>
-<div class="action-bar"><span class="action-tip" id="source-help"><svg><use href="#icon-info"/></svg>Masking keeps details consistent with labels like [NAME_1].</span><div class="actions"><button class="secondary" id="protect"><svg><use href="#icon-shield"/></svg>Protect my text</button><button class="primary" id="copy" disabled><svg><use href="#icon-copy"/></svg>Copy protected text<svg><use href="#icon-arrow"/></svg></button></div></div>
+<p class="path-help" id="manual-select-help">Select a missed detail in Original text, then choose Protect selection. Manual selections are removed when you edit the text.</p><div class="action-bar"><span class="action-tip" id="source-help"><svg><use href="#icon-info"/></svg>Masking keeps details consistent with labels like [NAME_1].</span><div class="actions"><button class="secondary" id="protect-selection" disabled>Protect selection</button><button class="secondary" id="protect"><svg><use href="#icon-shield"/></svg>Protect my text</button><button class="primary" id="copy" disabled><svg><use href="#icon-copy"/></svg>Copy protected text<svg><use href="#icon-arrow"/></svg></button></div></div>
 </section>
 <div class="notice"><svg><use href="#icon-info"/></svg><div><strong>A helpful layer, not a guarantee.</strong> Detection can miss details, especially names, international addresses, and unusual formats. Review the result and add custom phrases before sharing.</div></div>
 <section class="workspace restore-workspace" aria-label="Restore original details in an AI reply">
@@ -320,6 +321,10 @@ function detectPII(text, custom = []) {
   const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   add('CUSTOM', new RegExp(escaped, 'giu'));
  }
+ const addSecret = (value, start, reason) => candidates.push({type:'SECRET',start,end:start+value.length,value,reason});
+ for (const match of text.matchAll(/-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/g)) addSecret(match[0],match.index,'Private key block');
+ for (const match of text.matchAll(/\bBearer[ \t]+([A-Za-z0-9._~+\/-]+=*)/gi)) addSecret(match[1],match.index+match[0].lastIndexOf(match[1]),'Bearer authorization value');
+ for (const match of text.matchAll(/\b(?:password|passwd|pwd|token|api[_ -]?key|secret|access[_ -]?key|client[_ -]?secret)\b["']?[ \t]*[:=][ \t]*(["']?)([^\s"'`,;]+)\1/gi)) addSecret(match[2],match.index+match[0].lastIndexOf(match[2]),'Credential field');
  // Quotes delimit paths containing spaces. Unquoted paths end at whitespace or prose punctuation.
  add('PATH', /(["'`])((?:\\\\|smb:\/\/|[A-Z]:[\\/])[^\r\n]*?)\1/gi, () => true, 2);
  for (const match of text.matchAll(/(?<![\w/\\])(?:\\\\[^\s\\/"'`<>|,;()]+\\|smb:\/\/[^\s/"'`<>|,;()]+\/|[A-Z]:[\\/])[^\s"'`<>|,;()\[\]{}]*/gi)) {
@@ -341,6 +346,7 @@ function detectPII(text, custom = []) {
  candidates.sort((a,b) => a.start - b.start || b.end - a.end);
  const accepted = [];
  for (const item of candidates) {
+  if (item.type !== 'SECRET' && candidates.some(other => other.type === 'SECRET' && item.start < other.end && item.end > other.start)) continue;
   const previous = accepted[accepted.length - 1];
   if (previous && item.start < previous.end) {
    previous.end = Math.max(previous.end, item.end);
@@ -373,7 +379,7 @@ function replacementTokens(matches, mode) {
  return matches.map(item => {
   const key = item.type + ':' + item.value;
   if (!seen.has(key)) { counts[item.type] = (counts[item.type] || 0) + 1; seen.set(key, '[' + item.type + '_' + counts[item.type] + ']'); }
-  return mode === 'redact' ? partialRedaction(item) : seen.get(key);
+  return mode === 'redact' && item.type !== 'SECRET' ? partialRedaction(item) : seen.get(key);
  });
 }
 function redactText(text, matches, mode = 'mask') {
@@ -385,6 +391,7 @@ function redactText(text, matches, mode = 'mask') {
 function createRestorationMap(matches, mode = 'mask') {
  const map = new Map(), tokens = replacementTokens(matches, mode);
  matches.forEach((item,i) => {
+  if (item.type === 'SECRET') { map.set(tokens[i], {original:tokens[i],ambiguous:true}); return; }
   const entry = map.get(tokens[i]);
   if (!entry) map.set(tokens[i], {original:item.value, ambiguous:mode === 'redact' && !/[\p{L}\p{N}]/u.test(tokens[i])});
   else if (entry.original !== item.value) entry.ambiguous = true;
@@ -435,9 +442,9 @@ for (const id of ['source', 'ai-reply']) {
   });
  }
 }
-let mode = 'mask', customPhrases = [], matches = [], protectedText = '', excluded = new Set(), toastTimer;
+let mode = 'mask', customPhrases = [], matches = [], manualMatches = [], protectedText = '', excluded = new Set(), toastTimer;
 let currentMap = new Map(), savedMap = null, restoredReply = '';
-const typeNames = {NAME:'Name', EMAIL:'Email address', PHONE:'Phone number', ADDRESS:'Street address', CARD:'Credit card', ID:'US SSN', IP:'IP address', PATH:'Network / drive path', CUSTOM:'Custom phrase'};
+const typeNames = {NAME:'Name', EMAIL:'Email address', PHONE:'Phone number', ADDRESS:'Street address', CARD:'Credit card', ID:'US SSN', IP:'IP address', PATH:'Network / drive path', CUSTOM:'Custom phrase', MANUAL:'Manual selection', SECRET:'Credential or secret'};
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
 let themeChosen = false;
 function applyTheme(theme) {
@@ -451,7 +458,7 @@ applyTheme(document.documentElement.dataset.theme);
 $('theme-toggle').addEventListener('click', () => { themeChosen = true; applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); });
 systemTheme.addEventListener('change', event => { if (!themeChosen) applyTheme(event.matches ? 'dark' : 'light'); });
 function notify(message) { clearTimeout(toastTimer); $('toast').textContent = message; toastTimer = setTimeout(() => $('toast').textContent = '', 4500); }
-function activeMatches() { const enabled = new Set([...document.querySelectorAll('#categories input:checked')].map(x => x.value)); return matches.filter(item => (item.type === 'CUSTOM' || enabled.has(item.type)) && !excluded.has(item.start + ':' + item.end)); }
+function activeMatches() { const enabled = new Set([...document.querySelectorAll('#categories input:checked')].map(x => x.value)); return matches.filter(item => (item.type === 'SECRET' || item.type === 'MANUAL' || item.type === 'CUSTOM' || enabled.has(item.type)) && !excluded.has(item.start + ':' + item.end)); }
 function render() {
  const input = source.value, selected = activeMatches();
  renderInputPreview('source');
@@ -473,8 +480,31 @@ function render() {
  const tokens = replacementTokens(selected, mode);
  output.innerHTML = renderMarkdown(protectedText, tokens.map((token,i) => ({token,title:typeNames[selected[i].type]})));
 }
-function scan() { excluded.clear(); matches = detectPII(source.value, customPhrases); render(); }
+function scan() {
+ const hadManual = manualMatches.length > 0;
+ manualMatches = []; excluded.clear();
+ const detected = detectPII(source.value, customPhrases);
+ matches = [...detected.filter(item => item.type === 'SECRET'), ...detected.filter(item => item.type !== 'SECRET' && !manualMatches.some(manual => manual.start < item.end && manual.end > item.start))].sort((a,b) => a.start-b.start || b.end-a.end);
+ if (hadManual) notify('Manual selections cleared because the text changed.');
+ $('protect-selection').disabled = true;
+ render();
+}
 source.addEventListener('input', scan);
+function selectionReady() {
+ const start=source.selectionStart,end=source.selectionEnd;
+ $('protect-selection').disabled = start === end || !source.value.slice(start,end).trim();
+}
+for (const eventName of ['select','keyup','mouseup']) source.addEventListener(eventName, selectionReady);
+$('protect-selection').addEventListener('click', () => {
+ const start=source.selectionStart,end=source.selectionEnd,value=source.value.slice(start,end);
+ if (start === end || !value.trim()) return;
+ if (matches.some(item => item.type === 'SECRET' && start < item.end && end > item.start)) { notify('Credential selections are already protected and cannot be reclassified.'); return; }
+ if (manualMatches.some(item => start < item.end && end > item.start)) { notify('That selection overlaps a manual selection already protected.'); return; }
+ manualMatches.push({type:'MANUAL',start,end,value});
+ matches=matches.filter(item => item.type==='SECRET' || item.start>=end || item.end<=start).concat(manualMatches).sort((a,b)=>a.start-b.start || b.end-a.end);
+ $('protect-selection').disabled=true;
+ render(); notify('Selected text will be protected. Copy the result to save its restoration mapping.');
+});
 $('protect').addEventListener('click', () => { scan(); notify(source.value.trim() ? 'Updated. Review the protected text before sharing.' : 'Paste some text to get started.'); if (!source.value.trim()) source.focus(); });
 document.querySelectorAll('#categories input').forEach(input => input.addEventListener('change', render));
 function changeMode(next) {
@@ -593,7 +623,7 @@ $('review').addEventListener('click', () => {
  $('dialog-title').textContent = 'Review detected details'; $('dialog-content').replaceChildren();
  const intro = document.createElement('p'); intro.textContent = 'Uncheck a false positive to keep it in your prompt. Categories you turned off are also left unchanged.'; $('dialog-content').append(intro);
  const list = document.createElement('div'); list.className = 'review-list';
- matches.forEach(item => { const label = document.createElement('label'); label.className = 'review-item'; const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; const key = item.start + ':' + item.end; checkbox.checked = !excluded.has(key); checkbox.addEventListener('change', () => { checkbox.checked ? excluded.delete(key) : excluded.add(key); render(); }); const text = document.createElement('span'); text.textContent = item.value; const small = document.createElement('small'); small.textContent = typeNames[item.type]; text.append(small); label.append(checkbox,text); list.append(label); });
+ matches.forEach(item => { const label = document.createElement('label'); label.className = 'review-item'; const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; const key = item.start + ':' + item.end; checkbox.checked = !excluded.has(key); if(item.type==='SECRET') checkbox.disabled=true; checkbox.setAttribute('aria-label', 'Protect ' + typeNames[item.type]); checkbox.addEventListener('change', () => { checkbox.checked ? excluded.delete(key) : excluded.add(key); render(); }); const text = document.createElement('span'); text.textContent = item.value; const small = document.createElement('small'); small.textContent = typeNames[item.type] + (item.reason ? ' · ' + item.reason : ''); text.append(small); label.append(checkbox,text); list.append(label); });
  $('dialog-content').append(list); dialog.showModal();
 });
 scan();
