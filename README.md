@@ -18,7 +18,7 @@ Panels **01 Original text** and **03 AI reply** accept Markdown in **Edit** and 
 
 HTML is displayed literally. Markdown links and images show their labels and destinations as text; previews do not navigate or load images. The MIT-licensed Marked 18.0.14 parser and its license are embedded in `index.html` to keep the page self-contained and offline. Protected values remain literal and highlighted in the rendered preview.
 
-For `iwan.kelaiah@gmail.com`, Mask gives `[EMAIL_1]`; Redact gives `iw********ah@gmail.com`. Redact retains email domains, the last four digits of phones/cards/SSNs, some name characters, and parts of network paths. Mask replaces the entire detected value.
+For `ivan.kolalah@gmail.com`, Mask gives `[EMAIL_1]`; Redact gives `iv********ah@gmail.com`. Redact retains email domains, the last four digits of phones/cards/SSNs, some name characters, and parts of network paths. Mask replaces the entire detected value.
 
 Restoration uses the last copied prompt’s mapping, even if you switch modes or edit the source. Before a prompt has been copied, it uses the current preview. Keep the page open: there is no saved history. **Clear text** clears the original text, AI reply, restoration mapping, and custom phrases; loading a fictional example starts a fresh mapping too.
 
