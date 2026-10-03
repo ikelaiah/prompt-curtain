@@ -10,6 +10,10 @@ const {pathToFileURL} = require('node:url');
  ws.addEventListener('message', event => { const message = JSON.parse(event.data); if(message.id) { const item = pending.get(message.id); pending.delete(message.id); message.error ? item.reject(message.error) : item.resolve(message.result); } if(message.method === 'Runtime.exceptionThrown') errors.push(message.params); if(message.method === 'Network.requestWillBeSent') requests.push(message.params.request.url); });
  const send = (method,params={}) => new Promise((resolve,reject) => { const id = ++next; pending.set(id,{resolve,reject}); ws.send(JSON.stringify({id,method,params})); });
  const read = async expression => (await send('Runtime.evaluate',{expression,returnByValue:true})).result.value;
+ const assertAligned = async (input, output) => {
+  const tops = await read(`['${input}','${output}'].map(id => document.getElementById(id).getBoundingClientRect().top)`);
+  assert.ok(Math.abs(tops[0]-tops[1])<1,`${input} and ${output} should be top-aligned: ${tops.join(', ')}`);
+ };
  const readClipboard = async () => {
   await send('Browser.grantPermissions',{permissions:['clipboardReadWrite','clipboardSanitizedWrite']});
   const result = await send('Runtime.evaluate',{expression:'navigator.clipboard.readText()',returnByValue:true,awaitPromise:true});
@@ -35,6 +39,10 @@ const {pathToFileURL} = require('node:url');
  await click('customize-details'); assert.equal(await read("document.querySelector('.settings').open"),true);
  await click('customize-details'); assert.equal(await read("document.querySelector('.settings').open"),false);
  await click('example-it');
+ await assertAligned('source','output');
+ await click('source-preview-button');
+ await assertAligned('source-preview','output');
+ await click('source-edit');
  assert.match(await read("document.getElementById('output').textContent"),/\[NAME_1\]/);
  assert.match(await read("document.getElementById('output').textContent"),/\[EMAIL_1\]/);
  assert.doesNotMatch(await read("document.getElementById('output').textContent"),/alex.morgan@example.com/);
@@ -148,6 +156,7 @@ const {pathToFileURL} = require('node:url');
  const protectedMarkdown = markdown.replace('alex@example.com','[EMAIL_1]');
  await click('source'); await send('Input.insertText',{text:markdown});
  await click('source-preview-button');
+ await assertAligned('source-preview','output');
  assert.equal(await read("document.getElementById('source').hidden"),true);
  assert.equal(await read("document.querySelector('#source-preview h1').textContent"),'Request');
  assert.equal(await read("document.getElementById('source').value"),markdown);
@@ -163,6 +172,7 @@ const {pathToFileURL} = require('node:url');
  await send('Input.insertText',{text:copiedMarkdown});
  assert.equal(await read("document.getElementById('ai-reply').value"),protectedMarkdown);
  await click('ai-reply-preview-button');
+ await assertAligned('ai-reply-preview','restored-output');
  assert.equal(await read("document.querySelector('#ai-reply-preview h1').textContent"),'Request');
  assert.equal(await read("document.querySelector('#restored-output h1').textContent"),'Request');
  assert.match(await read("document.getElementById('restored-output').textContent"),/alex@example.com/);
@@ -175,7 +185,18 @@ const {pathToFileURL} = require('node:url');
  await send('Input.insertText',{text:copiedRestoredMarkdown});
  assert.equal(await read("document.getElementById('source').value"),markdown);
  await click('source-preview-button');
- for(const width of [320,768,1024,1440]) { await send('Emulation.setDeviceMetricsOverride',{width,height:1050,deviceScaleFactor:1,mobile:false}); assert.equal(await read('document.documentElement.scrollWidth > innerWidth'),false,`Overflow at ${width}`); assert.notEqual(await read("getComputedStyle(document.getElementById('theme-toggle')).display"),'none'); if(width === 320) fs.writeFileSync('tests/artifacts/mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true})).data,'base64')); }
+ for(const width of [320,768,1024,1440]) {
+  await send('Emulation.setDeviceMetricsOverride',{width,height:1050,deviceScaleFactor:1,mobile:false});
+  assert.equal(await read('document.documentElement.scrollWidth > innerWidth'),false,`Overflow at ${width}`);
+  assert.notEqual(await read("getComputedStyle(document.getElementById('theme-toggle')).display"),'none');
+  if(width>700) {
+   await assertAligned('source-preview','output');
+   await click('source-edit'); await assertAligned('source','output'); await click('source-preview-button');
+   await click('ai-reply-edit'); await assertAligned('ai-reply','restored-output');
+   await click('ai-reply-preview-button'); await assertAligned('ai-reply-preview','restored-output'); await click('ai-reply-edit');
+  }
+  if(width === 320) fs.writeFileSync('tests/artifacts/mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true})).data,'base64'));
+ }
  assert.equal(errors.length,0,JSON.stringify(errors));
  assert.equal(requests.filter(url => /^https?:/.test(url)).length,0);
  assert.equal(await read("[...document.querySelectorAll('button')].every(button => button.getAttribute('aria-label') || button.textContent.trim())"),true,'Every button has an accessible name');

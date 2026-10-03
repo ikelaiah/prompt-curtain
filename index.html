@@ -72,6 +72,16 @@ dialog::backdrop{background:#0b1e3273}
 .markdown-controls{display:flex;align-items:center;gap:8px;padding:0 23px 8px;color:var(--muted);font-size:11px}
 .markdown-controls .segmented{margin-left:auto}
 .markdown-controls .segmented button{padding:4px 9px}
+/* Share header and toolbar rows so paired text starts at the same height. */
+@media(min-width:701px){
+ .editors{grid-template-rows:auto auto 1fr auto auto}
+ .editor{display:grid;grid-row:span 5;grid-template-rows:subgrid}
+ .editor-header{grid-row:1}
+ .markdown-controls{grid-row:2}
+ .editor textarea,.editor>.output{grid-row:3}
+ .editor>.path-help{grid-row:4}
+ .editor-meta{grid-row:5;margin-top:0}
+}
 .output.markdown{white-space:normal;line-height:1.7}
 .markdown>:first-child{margin-top:0}.markdown>:last-child{margin-bottom:0}
 .markdown p{margin:0 0 12px;white-space:pre-wrap}
