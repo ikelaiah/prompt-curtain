@@ -38,7 +38,26 @@ PromptCurtain fully masks private key blocks, `Bearer` authorization values, and
 
 ## 🛡️ Your text stays on your device
 
-Detection, protection, previews, and restoration happen locally in the page. PromptCurtain doesn’t send text to a server or use analytics, cookies, or browser storage. Your text and restoration mapping stay in page memory; reload the page and they’re gone. **Clear text** clears the current prompt, reply, mapping, and custom phrases.
+**Your text never leaves the page, and the browser enforces it.** PromptCurtain is one HTML file with no backend.
+
+| Question | Answer |
+| --- | --- |
+| Is text sent anywhere? | No. Detection, masking, previews and restoration run in the page. |
+| What stops it from sending? | The page’s Content Security Policy: `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'`. The browser blocks network requests, form posts and every remote script, style, font or image. Inline code is allowed because the whole app is one file. |
+| Third-party code? | None. No external scripts, fonts, CDN, analytics or trackers. |
+| Accounts, cookies, telemetry? | None. |
+| What is stored? | Nothing. No cookies, `localStorage` or IndexedDB. Text and the restoration mapping live in page memory only. |
+| What can leave the page? | Only what you copy to the clipboard. |
+| Who sees the page load? | The host (GitHub Pages, or your own server) logs a normal file request. Save `index.html` and open it from disk to avoid even that. |
+
+Reload the page and everything is gone. **Clear text** clears the current prompt, reply, mapping and custom phrases.
+
+### Verify it yourself
+
+1. Open DevTools (**F12**) → **Network**, reload, then clear the list.
+2. Paste a prompt, protect it, restore a reply. The list stays empty.
+3. Go offline. Everything still works.
+4. View source: the CSP `<meta>` tag is on line 4. The automated browser test also fails on any external request.
 
 When you copy a protected prompt, PromptCurtain keeps its mapping in the open page so it can restore matching values in the reply. It only restores protected values the AI actually returns. If the AI omits a detail, PromptCurtain won’t add it back.
 
